@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "Stoke",
+    "slug": "stoke",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": false
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0A1628"
+      },
+      "edgeToEdgeEnabled": true,
+      "package": "com.anonymous.water"
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "color": "#00B4D8"
+        }
+      ],
+      "expo-background-fetch",
+      "expo-task-manager"
+    ]
+  }
+}

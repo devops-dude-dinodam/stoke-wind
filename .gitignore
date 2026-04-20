@@ -1,0 +1,26 @@
+node_modules/
+.expo/
+dist/
+build/
+*.jks
+*.keystore
+
+# Android build outputs
+android/app/build/
+android/build/
+android/.gradle/
+android/local.properties
+
+# iOS
+ios/build/
+ios/Pods/
+ios/DerivedData/
+
+# Misc
+.DS_Store
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+.env
+.env.local
