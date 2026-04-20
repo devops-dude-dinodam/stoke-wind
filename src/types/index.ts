@@ -32,6 +32,8 @@ export interface WeatherData {
   swellHeight: number;
   swellDirectionDeg: number;
   swellPeriod: number;
+  weatherCode: number;
+  temperature: number;
   fetchedAt: number;
 }
 

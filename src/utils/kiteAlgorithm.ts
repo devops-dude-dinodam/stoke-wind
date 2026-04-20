@@ -85,6 +85,16 @@ function getKiteSizeLabel(effectiveSpeed: number, kiteSize: number | null, isGus
   return 'Danger — No-Go';
 }
 
+export function getWeatherCondition(code: number): { label: string; emoji: string; isRain: boolean; isStorm: boolean } {
+  if (code === 0)  return { label: 'Clear',        emoji: '☀️',  isRain: false, isStorm: false };
+  if (code <= 3)   return { label: 'Cloudy',        emoji: '⛅',  isRain: false, isStorm: false };
+  if (code <= 48)  return { label: 'Fog',           emoji: '🌫️', isRain: false, isStorm: false };
+  if (code <= 67)  return { label: 'Rain',          emoji: '🌧️', isRain: true,  isStorm: false };
+  if (code <= 77)  return { label: 'Snow',          emoji: '❄️',  isRain: false, isStorm: false };
+  if (code <= 82)  return { label: 'Showers',       emoji: '🌦️', isRain: true,  isStorm: false };
+  return           { label: 'Thunderstorm',         emoji: '⛈️',  isRain: true,  isStorm: true  };
+}
+
 export function assessSpot(spotId: SpotId, weather: WeatherData, profile: UserProfile): SpotAssessment {
   const spot = SPOTS[spotId];
   const warnings: string[] = [];
@@ -119,6 +129,10 @@ export function assessSpot(spotId: SpotId, weather: WeatherData, profile: UserPr
     spot.warningSwell;
 
   // Warnings
+  const wx = getWeatherCondition(weather.weatherCode);
+  if (wx.isStorm) warnings.push('Thunderstorm — No-Go, lightning risk with a kite');
+  if (wx.isRain && !wx.isStorm) warnings.push('Raining — reduced visibility, slippery launch');
+
   if (dirRating === 'dangerous') warnings.push('Offshore wind — dangerous for all levels');
   if (dirRating === 'poor' && spotId === 'pringle') warnings.push('Mountain turbulence — very gusty/unpredictable');
   if (isGusty) warnings.push(`High Variance: Sized down for ${weather.windGust}kt gusts`);
@@ -142,10 +156,10 @@ export function assessSpot(spotId: SpotId, weather: WeatherData, profile: UserPr
   const tooStrong = weather.windGust > spot.absoluteMaxWind; 
   const dangerousSwell = weather.waveHeight > swellDangerThreshold;
 
-  // Swell only blocks if you're underpowered — can't punch through waves without speed
   const swellNoGo = dangerousSwell && weather.windSpeed < 15;
+  const isThunderstorm = getWeatherCondition(weather.weatherCode).isStorm;
 
-  if (dirRating === 'dangerous' || tooStrong || swellNoGo || (isGusty && gustDiff > 18)) {
+  if (dirRating === 'dangerous' || tooStrong || swellNoGo || isThunderstorm || (isGusty && gustDiff > 18)) {
     status = 'red';
     statusLabel = 'No-Go';
   } else if (

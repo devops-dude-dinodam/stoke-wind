@@ -9,14 +9,15 @@ function degreesToLabel(deg: number): string {
 }
 
 function getCurrentHourIndex(times: string[]): number {
-  const now = new Date();
-  const nowStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}T${String(now.getHours()).padStart(2,'0')}:00`;
+  // API returns times in Africa/Johannesburg (UTC+2, no DST) — use fixed offset
+  const jhb = new Date(Date.now() + 2 * 3_600_000);
+  const nowStr = `${jhb.getUTCFullYear()}-${String(jhb.getUTCMonth()+1).padStart(2,'0')}-${String(jhb.getUTCDate()).padStart(2,'0')}T${String(jhb.getUTCHours()).padStart(2,'0')}:00`;
   const idx = times.indexOf(nowStr);
   return idx >= 0 ? idx : 0;
 }
 
-async function fetchWeather(lat: number, lon: number): Promise<{ windSpeed: number; windGust: number; windDir: number }> {
-  const url = `${WEATHER_BASE}?latitude=${lat}&longitude=${lon}&hourly=wind_speed_10m,wind_direction_10m,wind_gusts_10m&wind_speed_unit=kn&timezone=Africa%2FJohannesburg&forecast_days=1`;
+async function fetchWeather(lat: number, lon: number): Promise<{ windSpeed: number; windGust: number; windDir: number; weatherCode: number; temperature: number }> {
+  const url = `${WEATHER_BASE}?latitude=${lat}&longitude=${lon}&hourly=wind_speed_10m,wind_direction_10m,wind_gusts_10m,weather_code,temperature_2m&wind_speed_unit=kn&timezone=Africa%2FJohannesburg&forecast_days=1`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Weather API error: ${res.status}`);
   const data = await res.json();
@@ -25,6 +26,8 @@ async function fetchWeather(lat: number, lon: number): Promise<{ windSpeed: numb
     windSpeed: data.hourly.wind_speed_10m[idx],
     windGust: data.hourly.wind_gusts_10m[idx],
     windDir: data.hourly.wind_direction_10m[idx],
+    weatherCode: data.hourly.weather_code[idx] ?? 0,
+    temperature: Math.round(data.hourly.temperature_2m[idx] ?? 0),
   };
 }
 
@@ -57,6 +60,8 @@ export async function fetchSpotWeather(spotId: SpotId): Promise<WeatherData> {
     swellHeight: marine.swellHeight,
     swellDirectionDeg: marine.swellDir,
     swellPeriod: marine.swellPeriod,
+    weatherCode: wind.weatherCode,
+    temperature: wind.temperature,
     fetchedAt: Date.now(),
   };
 }

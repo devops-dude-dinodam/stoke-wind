@@ -10,7 +10,7 @@ import { theme } from '../theme/theme';
 import { SpotAssessment, ConditionStatus, SpotId } from '../types';
 import { useWaterStore } from '../store/useWaterStore';
 import { fetchAllSpots } from '../utils/weatherApi';
-import { assessSpot, buildErrorAssessment } from '../utils/kiteAlgorithm';
+import { assessSpot, buildErrorAssessment, getWeatherCondition } from '../utils/kiteAlgorithm';
 import {
   buildConditionsSummary, scheduleDailyNotification,
   sendImmediateNotification, registerBackgroundTask,
@@ -147,6 +147,7 @@ function SpotSummaryCard({ assessment, onPress }: { assessment: SpotAssessment; 
                 <Text style={s.windDir}>{weather.windDirectionLabel}</Text>
                 {isGusty && <Text style={s.gustTag}>  ·  gusty</Text>}
               </Text>
+              <Text style={s.wxTag}>{getWeatherCondition(weather.weatherCode).emoji}  {weather.temperature}°C</Text>
             </View>
           )}
           {matchingKite && (
@@ -229,6 +230,7 @@ const s = StyleSheet.create({
   windUnit: { fontSize: theme.text.sm, color: theme.colors.textMuted },
   windDir: { fontSize: theme.text.base, fontWeight: '600', color: theme.colors.primary },
   gustTag: { fontSize: theme.text.xs, color: theme.colors.yellow },
+  wxTag: { fontSize: theme.text.xs, color: theme.colors.textMuted, marginLeft: 6 },
   kiteRec: { fontSize: theme.text.sm, fontWeight: '600' },
   statusBadge: {
     flexDirection: 'row',

@@ -14,7 +14,7 @@ import { theme } from '../theme/theme';
 import { SpotId, ConditionStatus, DirectionRating, DailyForecast } from '../types';
 import { useWaterStore } from '../store/useWaterStore';
 import { fetchDailyForecast } from '../utils/weatherApi';
-import { assessDailyForecast } from '../utils/kiteAlgorithm';
+import { assessDailyForecast, getWeatherCondition } from '../utils/kiteAlgorithm';
 import { getNextTideEvent, formatHoursAway } from '../utils/tideCalc';
 
 type Props = {
@@ -78,7 +78,14 @@ export default function SpotDetailScreen({ navigation, route }: Props) {
                 <Stat label="Speed" value={`${weather.windSpeed} kts`} />
                 <Stat label="Gusts" value={`${weather.windGust} kts`} highlight={isGusty} />
                 <Stat label="Direction" value={weather.windDirectionLabel} color={theme.colors.primary} />
+                <Stat label="Temp" value={`${weather.temperature}°C`} />
               </View>
+              {(() => { const wx = getWeatherCondition(weather.weatherCode); return (
+                <View style={s.wxRow}>
+                  <Text style={s.wxEmoji}>{wx.emoji}</Text>
+                  <Text style={[s.wxLabel, wx.isStorm && { color: theme.colors.red }, wx.isRain && !wx.isStorm && { color: theme.colors.yellow }]}>{wx.label}</Text>
+                </View>
+              ); })()}
               <View style={[s.directionBadge, { borderColor: directionRatingBorder(directionRating) }]}>
                 <Navigation size={13} color={directionRatingColor(directionRating)} />
                 <Text style={[s.directionText, { color: directionRatingColor(directionRating) }]}>
@@ -317,6 +324,9 @@ const s = StyleSheet.create({
     borderRadius: theme.radius.xl,
   },
   forecastBadgeText: { fontSize: theme.text.xs, fontWeight: '700' },
+  wxRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  wxEmoji: { fontSize: 14 },
+  wxLabel: { fontSize: theme.text.sm, fontWeight: '600', color: theme.colors.textSecondary },
   tideRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
   tideText: { fontSize: theme.text.sm, fontWeight: '600' },
   tideAway: { fontSize: theme.text.xs, color: theme.colors.textMuted },
