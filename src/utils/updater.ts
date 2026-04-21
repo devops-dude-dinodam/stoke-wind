@@ -1,7 +1,8 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import * as IntentLauncher from 'expo-intent-launcher';
+import { version } from '../../package.json';
 
-export const CURRENT_VERSION = 'v1.3';
+export const CURRENT_VERSION = `v${version.split('.').slice(0, 2).join('.')}`;
 
 const RELEASES_API = 'https://api.github.com/repos/devops-dude-dinodam/stoke-wind/releases/latest';
 
