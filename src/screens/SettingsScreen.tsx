@@ -1,20 +1,25 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
-  ScrollView, StatusBar, Alert,
+  ScrollView, StatusBar, Alert, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { ArrowLeft } from 'lucide-react-native';
+import { ArrowLeft, Download } from 'lucide-react-native';
 import { theme } from '../theme/theme';
 import { SkillLevel, RidingStyle } from '../types';
 import { useWaterStore } from '../store/useWaterStore';
 import { scheduleDailyNotification } from '../utils/notifications';
+import { CURRENT_VERSION, checkForUpdate, downloadAndInstall } from '../utils/updater';
 
 type Props = { navigation: NativeStackNavigationProp<any> };
 
 export default function SettingsScreen({ navigation }: Props) {
   const { profile, setProfile } = useWaterStore();
+
+  const [updateState, setUpdateState] = useState<'idle' | 'checking' | 'downloading' | 'up_to_date' | 'error'>('idle');
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [updateLabel, setUpdateLabel] = useState('');
 
   const [weight, setWeight] = useState(String(profile.weight));
   const [boardLength, setBoardLength] = useState(String(profile.boardLength ?? 142));
@@ -30,6 +35,48 @@ export default function SettingsScreen({ navigation }: Props) {
       setQuiver(prev => [...prev, size].sort((a, b) => b - a));
     }
     setKiteInput('');
+  }
+
+  async function handleCheckUpdate() {
+    setUpdateState('checking');
+    setUpdateLabel('');
+    try {
+      const info = await checkForUpdate();
+      if (!info.available) {
+        setUpdateState('up_to_date');
+        setUpdateLabel(`${CURRENT_VERSION} is the latest version`);
+        return;
+      }
+      if (!info.downloadUrl) {
+        setUpdateState('error');
+        setUpdateLabel('No APK found in latest release');
+        return;
+      }
+      Alert.alert(
+        `Update available — ${info.latestVersion}`,
+        'Download and install now?',
+        [
+          { text: 'Cancel', style: 'cancel', onPress: () => setUpdateState('idle') },
+          {
+            text: 'Install',
+            onPress: async () => {
+              setUpdateState('downloading');
+              setDownloadProgress(0);
+              try {
+                await downloadAndInstall(info.downloadUrl!, (pct) => setDownloadProgress(pct));
+                setUpdateState('idle');
+              } catch {
+                setUpdateState('error');
+                setUpdateLabel('Download failed — check your connection');
+              }
+            },
+          },
+        ],
+      );
+    } catch {
+      setUpdateState('error');
+      setUpdateLabel('Could not reach GitHub — check your connection');
+    }
   }
 
   async function save() {
@@ -154,6 +201,27 @@ export default function SettingsScreen({ navigation }: Props) {
           </View>
         </Section>
 
+        <View style={s.updateSection}>
+          <TouchableOpacity
+            style={[s.updateBtn, updateState === 'downloading' && { opacity: 0.6 }]}
+            onPress={handleCheckUpdate}
+            disabled={updateState === 'checking' || updateState === 'downloading'}
+          >
+            {updateState === 'checking' || updateState === 'downloading'
+              ? <ActivityIndicator size="small" color={theme.colors.primary} />
+              : <Download size={15} color={theme.colors.primary} />
+            }
+            <Text style={s.updateBtnText}>
+              {updateState === 'checking' && 'Checking...'}
+              {updateState === 'downloading' && `Downloading ${downloadProgress}%`}
+              {(updateState === 'idle' || updateState === 'up_to_date' || updateState === 'error') && 'Check for Update'}
+            </Text>
+          </TouchableOpacity>
+          <Text style={s.versionText}>
+            {updateState === 'up_to_date' || updateState === 'error' ? updateLabel : `Current version: ${CURRENT_VERSION}`}
+          </Text>
+        </View>
+
         <TouchableOpacity style={s.saveBtn} onPress={save}>
           <Text style={s.saveBtnText}>Save Changes</Text>
         </TouchableOpacity>
@@ -242,6 +310,19 @@ const s = StyleSheet.create({
   hourBtnSelected: { borderColor: theme.colors.primary },
   hourText: { color: theme.colors.textSecondary, fontWeight: '600' },
   hourTextSelected: { color: theme.colors.primary },
+  updateSection: { gap: theme.spacing.sm, alignItems: 'center' },
+  updateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+  },
+  updateBtnText: { color: theme.colors.primary, fontWeight: '600', fontSize: theme.text.sm },
+  versionText: { fontSize: theme.text.xs, color: theme.colors.textMuted },
   saveBtn: {
     backgroundColor: theme.colors.primary,
     borderRadius: theme.radius.md,
