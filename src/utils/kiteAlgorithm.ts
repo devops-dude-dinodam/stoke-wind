@@ -16,22 +16,20 @@ function getDirectionRating(spotId: SpotId, deg: number): { rating: DirectionRat
   const d = ((deg % 360) + 360) % 360;
 
   if (spotId === 'pringle') {
-    if (d >= 213 && d < 338) return { rating: 'ideal', label: 'Side-on / Onshore' };
-    if (d >= 338 || d < 12)  return { rating: 'good',  label: 'Onshore' };
-    if (d >= 157 && d < 213) return { rating: 'moderate', label: 'Side' };
-    if (d >= 124 && d < 157) return { rating: 'poor',    label: 'Gusty / Expert' };
-    if (d >= 57  && d < 124) return { rating: 'dangerous', label: 'Offshore' };
-    if (d >= 12  && d < 57)  return { rating: 'poor',    label: 'Side-offshore' };
-    return { rating: 'poor', label: 'Variable' };
+    // Only W/WNW (247°–300°) is kiteable — everything else is a hard No-Go
+    if (d >= 247 && d < 301) return { rating: 'ideal',     label: 'Side-onshore — prime window' };
+    if (d >= 301 || d < 31)  return { rating: 'dangerous', label: 'Mountain block — No-Go' };
+    if (d >= 100 && d < 171) return { rating: 'dangerous', label: 'Offshore — No-Go' };
+    return                          { rating: 'dangerous', label: 'Sub-optimal — No-Go' };
   }
 
-  // Silversands: SE is ideal (clean cross-shore), NW is offshore danger
-  if (d >= 101 && d < 213) return { rating: 'ideal',    label: 'Cross-shore' };
-  if (d >= 213 && d < 247) return { rating: 'good',     label: 'Cross-onshore' };
-  if (d >= 247 && d < 292) return { rating: 'moderate', label: 'Onshore' };
-  if (d >= 57  && d < 101) return { rating: 'moderate', label: 'Side' };
-  if (d >= 292 || d < 57)  return { rating: 'dangerous', label: 'Offshore' };
-  return { rating: 'poor', label: 'Variable' };
+  // Silversands: only E through SE works — everything else is No-Go
+  if (d >= 124 && d < 158) return { rating: 'ideal',     label: 'SE cross-shore — prime window' };
+  if (d >= 101 && d < 124) return { rating: 'good',      label: 'ESE — side-shore' };
+  if (d >= 67  && d < 101) return { rating: 'moderate',  label: 'E — gusty, over land' };
+  if (d >= 315 || d < 45)  return { rating: 'dangerous', label: 'N — straight offshore' };
+  if (d >= 158 && d < 247) return { rating: 'dangerous', label: 'S/SW — straight onshore' };
+  return                          { rating: 'dangerous', label: 'W/NW — side-offshore, No-Go' };
 }
 
 function getBoardLengthAdjustment(boardLength: number): number {
@@ -133,10 +131,23 @@ export function assessSpot(spotId: SpotId, weather: WeatherData, profile: UserPr
   if (wx.isStorm) warnings.push('Thunderstorm — No-Go, lightning risk with a kite');
   if (wx.isRain && !wx.isStorm) warnings.push('Raining — reduced visibility, slippery launch');
 
-  if (dirRating === 'dangerous') warnings.push('Offshore wind — dangerous for all levels');
-  if (dirRating === 'poor' && spotId === 'pringle') warnings.push('Mountain turbulence — very gusty/unpredictable');
+  if (spotId === 'pringle' && dirRating === 'dangerous') {
+    const d = ((weather.windDirectionDeg % 360) + 360) % 360;
+    if (d >= 301 || d < 31)  warnings.push('Wind blocked by the Rooi-Els mountains — extremely turbulent and gusty');
+    else if (d >= 100 && d < 171) warnings.push('South Easter is purely offshore and dangerous');
+    else warnings.push('Sub-optimal direction — mountain rotor or offshore risk');
+  } else if (spotId === 'silversands' && dirRating === 'dangerous') {
+    const d = ((weather.windDirectionDeg % 360) + 360) % 360;
+    if (d >= 315 || d < 45)  warnings.push('North wind is straight offshore — No-Go');
+    else if (d >= 158 && d < 247) warnings.push('South/SW wind is straight onshore — no upwind escape');
+    else warnings.push('Wind direction does not work at Silversands');
+  } else if (spotId === 'silversands' && dirRating === 'moderate') {
+    warnings.push('East wind comes over the land — expect gusts and holes');
+  } else if (dirRating === 'dangerous') {
+    warnings.push('Offshore wind — dangerous for all levels');
+  }
   if (isGusty) warnings.push(`High Variance: Sized down for ${weather.windGust}kt gusts`);
-  if (gustDiff > 12) warnings.push('Extreme gusts — kite stability is high risk');
+  if (gustDiff > 12) warnings.push('Extreme gusts — No-Go');
 
   const isWaveRider = profile.ridingStyle !== 'twin_tip';
   if (isWaveRider && weather.waveHeight < 0.5) warnings.push('Swell < 0.5m — flat water, wave riding not ideal');
@@ -176,6 +187,8 @@ export function assessSpot(spotId: SpotId, weather: WeatherData, profile: UserPr
     statusLabel = 'Caution';
   }
 
+  const isNoGo = status === 'red';
+
   return {
     spotId,
     name: spot.name,
@@ -185,9 +198,9 @@ export function assessSpot(spotId: SpotId, weather: WeatherData, profile: UserPr
     directionRating: dirRating,
     directionLabel: dirLabel,
     isGusty,
-    recommendedKiteSize,
-    matchingKite,
-    kiteSizeLabel,
+    recommendedKiteSize: isNoGo ? null : recommendedKiteSize,
+    matchingKite: isNoGo ? null : matchingKite,
+    kiteSizeLabel: isNoGo ? '—' : kiteSizeLabel,
     warnings,
     error: null,
   };

@@ -17,7 +17,7 @@ function getCurrentHourIndex(times: string[]): number {
 }
 
 async function fetchWeather(lat: number, lon: number): Promise<{ windSpeed: number; windGust: number; windDir: number; weatherCode: number; temperature: number }> {
-  const url = `${WEATHER_BASE}?latitude=${lat}&longitude=${lon}&hourly=wind_speed_10m,wind_direction_10m,wind_gusts_10m,weather_code,temperature_2m&wind_speed_unit=kn&timezone=Africa%2FJohannesburg&forecast_days=1`;
+  const url = `${WEATHER_BASE}?latitude=${lat}&longitude=${lon}&hourly=wind_speed_10m,wind_direction_10m,wind_gusts_10m,weather_code,temperature_2m&wind_speed_unit=kn&timezone=Africa%2FJohannesburg&forecast_days=1&models=ecmwf_ifs025`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Weather API error: ${res.status}`);
   const data = await res.json();
@@ -69,7 +69,7 @@ export async function fetchSpotWeather(spotId: SpotId): Promise<WeatherData> {
 export async function fetchDailyForecast(spotId: SpotId): Promise<DailyForecast[]> {
   const spot = SPOTS[spotId];
   const [weatherRes, marineRes] = await Promise.all([
-    fetch(`${WEATHER_BASE}?latitude=${spot.lat}&longitude=${spot.lon}&daily=wind_speed_10m_max,wind_gusts_10m_max,wind_direction_10m_dominant&wind_speed_unit=kn&timezone=Africa%2FJohannesburg&forecast_days=4`),
+    fetch(`${WEATHER_BASE}?latitude=${spot.lat}&longitude=${spot.lon}&daily=wind_speed_10m_max,wind_gusts_10m_max,wind_direction_10m_dominant&wind_speed_unit=kn&timezone=Africa%2FJohannesburg&forecast_days=4&models=ecmwf_ifs025`),
     fetch(`${MARINE_BASE}?latitude=${spot.lat}&longitude=${spot.lon}&daily=wave_height_max&timezone=Africa%2FJohannesburg&forecast_days=4`),
   ]);
   if (!weatherRes.ok || !marineRes.ok) throw new Error('Forecast fetch failed');

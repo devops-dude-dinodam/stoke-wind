@@ -9,14 +9,14 @@ interface WaterState {
   isFetching: boolean;
   lastFetchedAt: number | null;
   lastNotifiedAt: number;
-  previousGreenState: boolean;
+  previousGreenState: Record<SpotId, boolean>;
 
   setProfile: (profile: Partial<UserProfile>) => void;
   completeOnboarding: () => void;
   setAssessments: (assessments: Record<SpotId, SpotAssessment | null>) => void;
   setFetching: (v: boolean) => void;
   setLastNotifiedAt: (t: number) => void;
-  setPreviousGreenState: (v: boolean) => void;
+  setPreviousGreenState: (v: Record<SpotId, boolean>) => void;
 }
 
 export const useWaterStore = create<WaterState>()(
@@ -38,7 +38,7 @@ export const useWaterStore = create<WaterState>()(
       isFetching: false,
       lastFetchedAt: null,
       lastNotifiedAt: 0,
-      previousGreenState: false,
+      previousGreenState: { pringle: false, silversands: false },
 
       setProfile: (partial) =>
         set((s) => ({ profile: { ...s.profile, ...partial } })),
@@ -57,6 +57,13 @@ export const useWaterStore = create<WaterState>()(
     }),
     {
       name: 'water-storage-v1',
+      version: 2,
+      migrate: (persisted: any, version: number) => {
+        if (version < 2 && typeof persisted?.previousGreenState === 'boolean') {
+          persisted.previousGreenState = { pringle: false, silversands: false };
+        }
+        return persisted;
+      },
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (s) => ({
         profile: s.profile,

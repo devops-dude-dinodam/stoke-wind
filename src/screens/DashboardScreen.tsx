@@ -41,15 +41,22 @@ export default function DashboardScreen({ navigation }: Props) {
       setAssessments(result);
 
       const list = Object.values(result).filter(Boolean) as SpotAssessment[];
-      const anyGreen = list.some(a => a.status === 'green');
       const twoHours = 2 * 60 * 60 * 1000;
 
-      if (anyGreen && !previousGreenState && Date.now() - lastNotifiedAt > twoHours) {
-        await sendImmediateNotification('Conditions just turned green!', buildConditionsSummary(list));
+      const newlyGreen = list.filter(
+        a => a.status === 'green' && !previousGreenState[a.spotId as SpotId],
+      );
+
+      if (newlyGreen.length > 0 && Date.now() - lastNotifiedAt > twoHours) {
+        const names = newlyGreen.map(a => a.name).join(' & ');
+        const verb = newlyGreen.length > 1 ? 'are' : 'is';
+        await sendImmediateNotification(`🟢 ${names} ${verb} a Go!`, buildConditionsSummary(newlyGreen));
         setLastNotifiedAt(Date.now());
       }
 
-      setPreviousGreenState(anyGreen);
+      const nextGreenState = { pringle: false, silversands: false } as Record<SpotId, boolean>;
+      for (const a of list) nextGreenState[a.spotId as SpotId] = a.status === 'green';
+      setPreviousGreenState(nextGreenState);
       await scheduleDailyNotification(profile.notificationHour, buildConditionsSummary(list));
 
     } catch (e) {

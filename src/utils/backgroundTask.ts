@@ -24,15 +24,22 @@ TaskManager.defineTask(BACKGROUND_TASK, async () => {
     state.setAssessments(result);
 
     const list = Object.values(result).filter(Boolean) as SpotAssessment[];
-    const anyGreen = list.some(a => a.status === 'green');
     const twoHours = 2 * 60 * 60 * 1000;
 
-    if (anyGreen && !previousGreenState && Date.now() - lastNotifiedAt > twoHours) {
-      await sendImmediateNotification('🟢 Conditions just turned green!', buildConditionsSummary(list));
+    const newlyGreen = list.filter(
+      a => a.status === 'green' && !previousGreenState[a.spotId as SpotId],
+    );
+
+    if (newlyGreen.length > 0 && Date.now() - lastNotifiedAt > twoHours) {
+      const names = newlyGreen.map(a => a.name).join(' & ');
+      const verb = newlyGreen.length > 1 ? 'are' : 'is';
+      await sendImmediateNotification(`🟢 ${names} ${verb} a Go!`, buildConditionsSummary(newlyGreen));
       state.setLastNotifiedAt(Date.now());
     }
 
-    state.setPreviousGreenState(anyGreen);
+    const nextGreenState = { pringle: false, silversands: false } as Record<SpotId, boolean>;
+    for (const a of list) nextGreenState[a.spotId as SpotId] = a.status === 'green';
+    state.setPreviousGreenState(nextGreenState);
 
     return BackgroundFetch.BackgroundFetchResult.NewData;
   } catch {
