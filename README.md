@@ -2,7 +2,7 @@
 
 A personal kiteboarding forecast app for Pringle Bay and Silversands (Betty's Bay), South Africa.
 
-Stoke gives you a Go / No-Go verdict for each spot based on wind direction, wind speed, gusts, and swell — personalised to your weight, board length, kite quiver, skill level, and riding style. It also recommends which kite to fly, shows a 3-day outlook, and sends you a daily push notification with the morning conditions.
+Stoke gives you a Go / No-Go verdict for each spot based on wind direction, wind speed, gusts, and swell — personalised to your weight, board length, kite quiver, skill level, and riding style. It also recommends which kite to fly, shows a 3-day outlook, and sends push notifications when conditions turn green.
 
 ---
 
@@ -11,14 +11,14 @@ Stoke gives you a Go / No-Go verdict for each spot based on wind direction, wind
 - Go / No-Go / Marginal status for Pringle Bay and Silversands
 - Kite size recommendation based on weight, board length, skill level, and riding style
 - Twin tip, wave strapped, and wave strapless riding styles with separate size logic
-- Wind direction rating with spot-specific offshore/onshore knowledge baked in
+- Strict spot-specific direction logic — Pringle and Silversands have nearly inverted wind windows
 - Gust-weighted effective wind speed for safer kite sizing
 - 3-day forecast showing max wind, dominant direction, swell, and kite rec per day
 - Next tide event (high or low) for False Bay using M2 harmonic calculation
 - Current weather condition and temperature
 - Thunderstorm hard No-Go with lightning warning
-- Daily push notification at a time you choose
-- Instant notification when conditions flip green during the day
+- Daily push notification at a time you choose, summarising both spots
+- Instant notification naming the specific spot(s) that just turned green
 - Hourly background condition checks
 
 ---
@@ -26,10 +26,10 @@ Stoke gives you a Go / No-Go verdict for each spot based on wind direction, wind
 ## Spots
 
 **Pringle Bay**
-SW to NW is ideal (side-on to onshore). SE winds come over the mountains and are gusty and unreliable. E/ESE is offshore and dangerous. Minimum wind 12 knots.
+Only W/WNW (247–300°) is kiteable. The Rooi-Els mountains block and distort everything else — north and northeast create extreme rotor, southeast is offshore and dangerous. Minimum wind 12 knots.
 
 **Silversands (Betty's Bay)**
-SE is the ideal cross-shore direction. NW is offshore and dangerous. Minimum wind 14 knots. Heavy shorebreak focus — swell warnings trigger earlier than Pringle.
+SE is ideal cross-shore. ESE works but is slightly side-shore. East can work but comes over land and is gusty. All other directions are No-Go: north is straight offshore, south and SW are straight onshore, west is side-offshore. Minimum wind 14 knots. Heavy shorebreak focus — swell warnings trigger earlier than Pringle.
 
 ---
 
@@ -50,14 +50,18 @@ Riding style multipliers: twin tip 1.0, wave strapped 0.85, wave strapless 0.75.
 
 Wave riding hard cap: 12 m maximum regardless of calculation.
 
+Kite size is suppressed and shown as No-Go when conditions are red.
+
 ---
 
 ## Weather Data
 
 Conditions are fetched from Open-Meteo (free, no API key required):
-- Wind speed, gusts, direction: Open-Meteo forecast API
+- Wind speed, gusts, direction: Open-Meteo forecast API using ECMWF IFS 0.25° model
 - Wave height, swell height, swell period: Open-Meteo marine API
 - Weather code and temperature: Open-Meteo forecast API
+
+The ECMWF 0.25° model is used specifically because it resolves Pringle Bay and Silversands to different grid points — coarser models snap both spots to the same coordinates and return identical data.
 
 Data is refreshed on app launch and on manual pull-to-refresh. A background task checks conditions hourly.
 
@@ -106,7 +110,7 @@ Download the new APK from the releases page and install it over the existing ver
 If you have Android Debug Bridge installed on your computer and USB debugging enabled on your phone:
 
 ```bash
-adb install stoke-v1.2.apk
+adb install stoke-v1.3.apk
 ```
 
 ---
@@ -132,7 +136,7 @@ The APK will be at `android/app/build/outputs/apk/release/app-release.apk`.
 - React Native 0.81 with Expo SDK 54
 - TypeScript strict mode
 - Zustand v5 with AsyncStorage persistence
-- Open-Meteo weather and marine APIs
+- Open-Meteo weather and marine APIs (ECMWF IFS 0.25° model)
 - expo-notifications for push alerts
 - expo-background-fetch and expo-task-manager for hourly background checks
 - lucide-react-native for icons
