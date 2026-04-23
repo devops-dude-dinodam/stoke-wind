@@ -277,8 +277,8 @@ function WindParticle({ startX, startY, duration, delay, dx, dy, rotateDeg }: {
   return (
     <Animated.View style={[{ position: 'absolute' }, style]}>
       <Svg width={10} height={20}>
-        <Line x1={5} y1={18} x2={5} y2={6} stroke={theme.colors.primary} strokeWidth={2} strokeLinecap="round" />
-        <Polygon points="5,1 1.5,8 8.5,8" fill={theme.colors.primary} />
+        <Line x1={5} y1={18} x2={5} y2={6} stroke="rgba(255,255,255,0.9)" strokeWidth={2} strokeLinecap="round" />
+        <Polygon points="5,1 1.5,8 8.5,8" fill="rgba(255,255,255,0.9)" />
       </Svg>
     </Animated.View>
   );

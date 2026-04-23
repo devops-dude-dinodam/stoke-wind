@@ -25,9 +25,13 @@ export default function DashboardScreen({ navigation }: Props) {
     setPreviousGreenState, setLastNotifiedAt, lastNotifiedAt,
   } = useWaterStore();
 
+  const REFRESH_COOLDOWN = 60_000;
+  const canRefresh = !isFetching && (!lastFetchedAt || Date.now() - lastFetchedAt > REFRESH_COOLDOWN);
+
   const didMount = useRef(false);
 
-  const fetchConditions = useCallback(async () => {
+  const fetchConditions = useCallback(async (force = false) => {
+    if (!force && lastFetchedAt && Date.now() - lastFetchedAt < REFRESH_COOLDOWN) return;
     setFetching(true);
     try {
       const weatherMap = await fetchAllSpots();
@@ -73,7 +77,7 @@ export default function DashboardScreen({ navigation }: Props) {
   useEffect(() => {
     if (!didMount.current) {
       didMount.current = true;
-      fetchConditions();
+      fetchConditions(true);
       registerBackgroundTask();
     }
   }, [fetchConditions]);
@@ -106,8 +110,8 @@ export default function DashboardScreen({ navigation }: Props) {
           {isFetching
             ? <ActivityIndicator color={theme.colors.primary} size="small" />
             : (
-              <TouchableOpacity onPress={fetchConditions} style={s.iconBtn}>
-                <RefreshCw size={20} color={theme.colors.textSecondary} />
+              <TouchableOpacity onPress={() => fetchConditions()} style={s.iconBtn} disabled={!canRefresh}>
+                <RefreshCw size={20} color={canRefresh ? theme.colors.textSecondary : theme.colors.textMuted} />
               </TouchableOpacity>
             )
           }
