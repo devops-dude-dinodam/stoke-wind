@@ -16,18 +16,21 @@ function getDirectionRating(spotId: SpotId, deg: number): { rating: DirectionRat
   const d = ((deg % 360) + 360) % 360;
 
   if (spotId === 'pringle') {
-    // Only W/WNW (247°–300°) is kiteable — everything else is a hard No-Go
+    // Beach runs N-S (185°), faces west (275°) — Rooi-Els mountains to the north
     if (d >= 247 && d < 301) return { rating: 'ideal',     label: 'Side-onshore — prime window' };
-    if (d >= 301 || d < 31)  return { rating: 'dangerous', label: 'Mountain block — No-Go' };
-    if (d >= 100 && d < 171) return { rating: 'dangerous', label: 'Offshore — No-Go' };
-    return                          { rating: 'dangerous', label: 'Sub-optimal — No-Go' };
+    if (d >= 301 && d < 326) return { rating: 'moderate',  label: 'NW — rotor risk, experienced only' };
+    if (d >= 326 || d < 31)  return { rating: 'dangerous', label: 'Mountain block — extreme rotor' };
+    if (d >= 31  && d < 67)  return { rating: 'dangerous', label: 'NE — cross-offshore, No-Go' };
+    if (d >= 67  && d < 171) return { rating: 'dangerous', label: 'Offshore — No-Go' };
+    return                          { rating: 'dangerous', label: 'S/SW — onshore from south, No-Go' };
   }
 
-  // Silversands: only E through SE works — everything else is No-Go
+  // Silversands beach runs E-W (89.85°), faces due south — False Bay is directly south
   if (d >= 124 && d < 158) return { rating: 'ideal',     label: 'SE cross-shore — prime window' };
   if (d >= 101 && d < 124) return { rating: 'good',      label: 'ESE — side-shore' };
   if (d >= 67  && d < 101) return { rating: 'moderate',  label: 'E — gusty, over land' };
-  if (d >= 315 || d < 45)  return { rating: 'dangerous', label: 'N — straight offshore' };
+  if (d >= 45  && d < 67)  return { rating: 'moderate',  label: 'NE — side-offshore, may swing E' };
+  if (d >= 326 || d < 45)  return { rating: 'dangerous', label: 'N — straight offshore' };
   if (d >= 158 && d < 247) return { rating: 'dangerous', label: 'S/SW — straight onshore' };
   return                          { rating: 'dangerous', label: 'W/NW — side-offshore, No-Go' };
 }
@@ -164,8 +167,9 @@ export function assessSpot(spotId: SpotId, weather: WeatherData, profile: UserPr
   let statusLabel: string = 'Marginal';
 
   const tooLight = weather.windSpeed < spot.minWind;
-  const tooStrong = weather.windGust > spot.absoluteMaxWind; 
+  const tooStrong = weather.windGust > spot.absoluteMaxWind;
   const dangerousSwell = weather.waveHeight > swellDangerThreshold;
+  const worthACheck = tooLight && weather.windGust >= 12 && dirRating !== 'dangerous';
 
   const swellNoGo = dangerousSwell && weather.windSpeed < 15;
   const isThunderstorm = getWeatherCondition(weather.weatherCode).isStorm;
@@ -180,9 +184,10 @@ export function assessSpot(spotId: SpotId, weather: WeatherData, profile: UserPr
   ) {
     status = 'green';
     statusLabel = 'Go!';
-  } 
-  // Everything else is Marginal (Yellow)
-  else {
+  } else if (worthACheck) {
+    status = 'yellow';
+    statusLabel = 'Worth a Check';
+  } else {
     status = 'yellow';
     statusLabel = 'Caution';
   }
