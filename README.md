@@ -10,7 +10,7 @@ Stoke gives you a Go / No-Go verdict for each spot based on wind direction, wind
 
 - Go / No-Go / Marginal / Worth a Check status for Pringle Bay and Silversands
 - Most kiteable spot always sorted to the top of the dashboard
-- Satellite map overlay per spot with Windy-style animated arrows flowing in real wind direction — particle count and speed scale to the average of lull and gust
+- Satellite map overlay per spot with Windy-style animated white arrows flowing in real wind direction — particle count and speed scale to the average of lull and gust
 - Kite size recommendation based on weight, board length, skill level, and riding style
 - Twin tip, wave strapped, and wave strapless riding styles with separate size logic
 - Strict spot-specific direction logic verified against Google Earth bearings — Pringle and Silversands have nearly inverted wind windows
@@ -67,7 +67,7 @@ Conditions are fetched from Open-Meteo (free, no API key required):
 
 The ECMWF 0.25° model is used specifically because it resolves Pringle Bay and Silversands to different grid points — coarser models snap both spots to the same coordinates and return identical data.
 
-Data is refreshed on app launch and on manual pull-to-refresh. A background task checks conditions hourly.
+Data is refreshed on app launch and on manual pull-to-refresh. A 60-second rate limit prevents spamming the free API — the refresh button dims and pull-to-refresh no-ops within the cooldown window. A background task checks conditions hourly.
 
 ---
 
@@ -114,7 +114,7 @@ Download the new APK from the releases page and install it over the existing ver
 If you have Android Debug Bridge installed on your computer and USB debugging enabled on your phone:
 
 ```bash
-adb install stoke-v1.5.apk
+adb install stoke-v1.6.apk
 ```
 
 ---
