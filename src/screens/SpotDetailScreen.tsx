@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, ActivityIndicator,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, ActivityIndicator, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -10,12 +10,21 @@ import {
   CheckCircle, XCircle, MinusCircle, Navigation, Calendar,
   ArrowUp, ArrowDown,
 } from 'lucide-react-native';
+import Svg, { Line, Polygon } from 'react-native-svg';
+import Animated, {
+  useSharedValue, useAnimatedStyle, withRepeat, withTiming, withDelay, Easing,
+} from 'react-native-reanimated';
 import { theme } from '../theme/theme';
 import { SpotId, ConditionStatus, DirectionRating, DailyForecast } from '../types';
 import { useWaterStore } from '../store/useWaterStore';
 import { fetchDailyForecast } from '../utils/weatherApi';
 import { assessDailyForecast, getWeatherCondition } from '../utils/kiteAlgorithm';
 import { getNextTideEvent, formatHoursAway } from '../utils/tideCalc';
+
+const spotImages: Record<SpotId, any> = {
+  pringle: require('../../assets/pringle.png'),
+  silversands: require('../../assets/silversands.png'),
+};
 
 type Props = {
   navigation: NativeStackNavigationProp<any>;
@@ -68,6 +77,17 @@ export default function SpotDetailScreen({ navigation, route }: Props) {
           <Text style={s.errorText}>{error}</Text>
         ) : weather ? (
           <>
+            {/* Satellite image + wind direction overlay */}
+            <View style={s.mapBlock}>
+              <Image source={spotImages[spotId]} style={s.spotImage} resizeMode="cover" />
+              <WindFlow deg={weather.windDirectionDeg} windSpeed={weather.windSpeed} windGust={weather.windGust} />
+              <View style={s.mapLabel}>
+                <Text style={s.mapLabelText}>
+                  {weather.windDirectionLabel}  ·  {weather.windSpeed} kts
+                </Text>
+              </View>
+            </View>
+
             {/* Wind block */}
             <View style={s.block}>
               <View style={s.blockHeader}>
@@ -188,6 +208,82 @@ export default function SpotDetailScreen({ navigation, route }: Props) {
   );
 }
 
+function WindFlow({ deg, windSpeed, windGust }: { deg: number; windSpeed: number; windGust: number }) {
+  // Particles travel downwind
+  const travelDeg = (deg + 180) % 360;
+  const rad = (travelDeg - 90) * (Math.PI / 180);
+  const dx = Math.cos(rad);
+  const dy = Math.sin(rad);
+
+  // Use average of lull and gust as representative speed
+  const avgSpeed = (windSpeed + windGust) / 2;
+  const count = Math.round(Math.min(20, Math.max(4, avgSpeed * 0.55)));
+  const baseDuration = Math.max(650, 3200 - avgSpeed * 72);
+
+  const particles = useMemo(
+    () => Array.from({ length: count }, (_, i) => ({
+      startX: Math.random() * 380,
+      startY: Math.random() * 220,
+      duration: baseDuration + Math.random() * baseDuration * 0.4,
+      delay: i * Math.round(2200 / count),
+    })),
+    [count, baseDuration],
+  );
+
+  return (
+    <View style={s.windOverlay}>
+      {particles.map((p, i) => (
+        <WindParticle
+          key={i}
+          startX={p.startX}
+          startY={p.startY}
+          duration={p.duration}
+          delay={p.delay}
+          dx={dx}
+          dy={dy}
+          rotateDeg={travelDeg}
+        />
+      ))}
+    </View>
+  );
+}
+
+function WindParticle({ startX, startY, duration, delay, dx, dy, rotateDeg }: {
+  startX: number; startY: number; duration: number; delay: number;
+  dx: number; dy: number; rotateDeg: number;
+}) {
+  const progress = useSharedValue(0);
+
+  useEffect(() => {
+    progress.value = withDelay(
+      delay,
+      withRepeat(withTiming(1, { duration, easing: Easing.linear }), -1, false),
+    );
+  }, [duration]);
+
+  const style = useAnimatedStyle(() => {
+    const p = progress.value;
+    const opacity = p < 0.15 ? p / 0.15 : p > 0.72 ? (1 - p) / 0.28 : 0.85;
+    return {
+      transform: [
+        { translateX: startX + p * dx * 260 },
+        { translateY: startY + p * dy * 260 },
+        { rotate: `${rotateDeg}deg` },
+      ],
+      opacity,
+    };
+  });
+
+  return (
+    <Animated.View style={[{ position: 'absolute' }, style]}>
+      <Svg width={10} height={20}>
+        <Line x1={5} y1={18} x2={5} y2={6} stroke={theme.colors.primary} strokeWidth={2} strokeLinecap="round" />
+        <Polygon points="5,1 1.5,8 8.5,8" fill={theme.colors.primary} />
+      </Svg>
+    </Animated.View>
+  );
+}
+
 function TideRow() {
   const tide = getNextTideEvent();
   const isHigh = tide.type === 'high';
@@ -303,6 +399,28 @@ const s = StyleSheet.create({
   warningRow: { flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.sm },
   warningDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: theme.colors.yellow, marginTop: 6 },
   warningText: { flex: 1, fontSize: theme.text.sm, color: theme.colors.yellow, lineHeight: 20 },
+  mapBlock: {
+    borderRadius: theme.radius.lg,
+    overflow: 'hidden',
+    height: 220,
+    position: 'relative',
+  },
+  spotImage: { width: '100%', height: '100%' },
+  windOverlay: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    overflow: 'hidden',
+  },
+  mapLabel: {
+    position: 'absolute',
+    bottom: theme.spacing.md,
+    left: theme.spacing.md,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 4,
+    borderRadius: theme.radius.sm,
+  },
+  mapLabelText: { color: '#fff', fontSize: theme.text.sm, fontWeight: '700' },
   errorText: { fontSize: theme.text.sm, color: theme.colors.red, textAlign: 'center', padding: theme.spacing.xl },
   forecastRow: {
     flexDirection: 'row',

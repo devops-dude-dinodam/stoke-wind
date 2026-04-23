@@ -78,9 +78,20 @@ export default function DashboardScreen({ navigation }: Props) {
     }
   }, [fetchConditions]);
 
+  const statusRank = (a: SpotAssessment) => {
+    if (a.status === 'green') return 0;
+    if (a.status === 'yellow') {
+      if (a.statusLabel === 'Worth a Check') return 1;
+      return 2;
+    }
+    return 3;
+  };
+
   const spotList: SpotAssessment[] = (['pringle', 'silversands'] as SpotId[])
     .map(id => assessments[id])
     .filter(Boolean) as SpotAssessment[];
+
+  spotList.sort((a, b) => statusRank(a) - statusRank(b));
 
   return (
     <SafeAreaView style={s.root}>

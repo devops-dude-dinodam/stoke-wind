@@ -59,8 +59,7 @@ export function calculateRecommendedKiteSize(
   let adjusted = raw * SKILL_MULTIPLIER[skillLevel] * STYLE_MULTIPLIER[ridingStyle];
   adjusted += getBoardLengthAdjustment(boardLength);
 
-  if (ridingStyle !== 'twin_tip' && adjusted > 12) adjusted = 12;
-  if (ridingStyle === 'twin_tip' && gustSpeed > 22 && adjusted > 13) adjusted = 12;
+  if (adjusted > 12) adjusted = 12;
 
   return Math.round(Math.max(adjusted, 0));
 }
@@ -78,7 +77,7 @@ function getKiteSizeLabel(effectiveSpeed: number, kiteSize: number | null, isGus
   if (!kiteSize) return 'No kite in range';
   const suffix = isGusty ? ' (sized to gusts)' : '';
   
-  if (effectiveSpeed < 12) return 'No-Go — too light';
+  if (effectiveSpeed < 12) return `${kiteSize}m — Marginal, Worth a Check`;
   if (effectiveSpeed <= 14) return `${kiteSize}m — Low Power${suffix}`;
   if (effectiveSpeed <= 22) return `${kiteSize}m — Sweet Spot${suffix}`;
   if (effectiveSpeed <= 30) return `${kiteSize}m — Strong Wind${suffix}`;
