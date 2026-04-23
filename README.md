@@ -114,7 +114,7 @@ Download the new APK from the releases page and install it over the existing ver
 If you have Android Debug Bridge installed on your computer and USB debugging enabled on your phone:
 
 ```bash
-adb install stoke-v1.6.apk
+adb install stoke-v1.7.apk
 ```
 
 ---
