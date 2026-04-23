@@ -16,6 +16,9 @@ ios/build/
 ios/Pods/
 ios/DerivedData/
 
+# Release APKs — upload to GitHub Releases only, never commit
+*.apk
+
 # Misc
 .DS_Store
 *.log
