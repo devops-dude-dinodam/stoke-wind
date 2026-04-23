@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, ActivityIndicator, Image,
+  Share, Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -8,17 +9,17 @@ import { RouteProp } from '@react-navigation/native';
 import {
   ArrowLeft, Wind, Waves, AlertTriangle, Zap,
   CheckCircle, XCircle, MinusCircle, Navigation, Calendar,
-  ArrowUp, ArrowDown,
+  ArrowUp, ArrowDown, Share2, Clock,
 } from 'lucide-react-native';
 import Svg, { Line, Polygon } from 'react-native-svg';
 import Animated, {
   useSharedValue, useAnimatedStyle, withRepeat, withTiming, withDelay, Easing,
 } from 'react-native-reanimated';
 import { theme } from '../theme/theme';
-import { SpotId, ConditionStatus, DirectionRating, DailyForecast } from '../types';
+import { SpotId, ConditionStatus, DirectionRating, DailyForecast, BestWindow, SpotAssessment, HourlySlot } from '../types';
 import { useWaterStore } from '../store/useWaterStore';
 import { fetchDailyForecast } from '../utils/weatherApi';
-import { assessDailyForecast, getWeatherCondition } from '../utils/kiteAlgorithm';
+import { assessDailyForecast, getWeatherCondition, getDirectionRating } from '../utils/kiteAlgorithm';
 import { getNextTideEvent, formatHoursAway } from '../utils/tideCalc';
 
 const spotImages: Record<SpotId, any> = {
@@ -35,6 +36,8 @@ export default function SpotDetailScreen({ navigation, route }: Props) {
   const spotId = route.params?.spotId as SpotId;
   const assessment = useWaterStore(s => s.assessments[spotId]);
   const profile = useWaterStore(s => s.profile);
+  const bestWindow = useWaterStore(s => s.bestWindows[spotId]);
+  const hourlySlots = useWaterStore(s => s.hourlySlots[spotId]);
   const [forecast, setForecast] = useState<DailyForecast[] | null>(null);
   const [forecastLoading, setForecastLoading] = useState(true);
 
@@ -65,9 +68,14 @@ export default function SpotDetailScreen({ navigation, route }: Props) {
           <ArrowLeft size={22} color={theme.colors.textSecondary} />
         </TouchableOpacity>
         <Text style={s.headerTitle}>{name}</Text>
-        <View style={[s.statusPill, { backgroundColor: colors.badgeBg }]}>
-          <StatusIcon status={status} size={13} color={colors.text} />
-          <Text style={[s.statusText, { color: colors.text }]}>{assessment.statusLabel}</Text>
+        <View style={s.headerRight}>
+          <TouchableOpacity onPress={() => shareConditions(assessment, bestWindow)} style={s.shareBtn}>
+            <Share2 size={18} color={theme.colors.textSecondary} />
+          </TouchableOpacity>
+          <View style={[s.statusPill, { backgroundColor: colors.badgeBg }]}>
+            <StatusIcon status={status} size={13} color={colors.text} />
+            <Text style={[s.statusText, { color: colors.text }]}>{assessment.statusLabel}</Text>
+          </View>
         </View>
       </View>
 
@@ -112,10 +120,21 @@ export default function SpotDetailScreen({ navigation, route }: Props) {
                   {weather.windDirectionLabel} · {directionLabel}
                 </Text>
               </View>
+              {hourlySlots && hourlySlots.length > 0 && (
+                <HourlyWindStrip spotId={spotId} slots={hourlySlots} />
+              )}
               {isGusty && (
                 <Text style={s.gustNote}>
                   Gust range {weather.windGust - weather.windSpeed} kts above average — kite sized to gusts for safety
                 </Text>
+              )}
+              {bestWindow && (
+                <View style={s.windowRow}>
+                  <Clock size={13} color={theme.colors.primary} />
+                  <Text style={s.windowText}>
+                    {`Best today: ${formatHour(bestWindow.startHour)} – ${formatHour(bestWindow.endHour)}  ·  ${bestWindow.peakWindSpeed}kts ${bestWindow.windDirectionLabel}${bestWindow.kiteSize ? `  ·  ${bestWindow.kiteSize}m` : ''}`}
+                  </Text>
+                </View>
               )}
             </View>
 
@@ -284,6 +303,41 @@ function WindParticle({ startX, startY, duration, delay, dx, dy, rotateDeg }: {
   );
 }
 
+function HourlyWindStrip({ spotId, slots }: { spotId: SpotId; slots: HourlySlot[] }) {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={s.stripScroll}
+      contentContainerStyle={s.stripContent}
+    >
+      {slots.map(slot => {
+        const { rating } = getDirectionRating(spotId, slot.windDirectionDeg);
+        const isDangerous = rating === 'dangerous';
+        const isLight = slot.windSpeed < 8;
+        const arrowColor = isDangerous
+          ? theme.colors.red
+          : isLight
+            ? theme.colors.textMuted
+            : rating === 'ideal' || rating === 'good'
+              ? theme.colors.green
+              : theme.colors.yellow;
+        const rotation = (slot.windDirectionDeg + 180) % 360;
+
+        return (
+          <View key={slot.hour} style={s.stripSlot}>
+            <Text style={s.stripHour}>{String(slot.hour).padStart(2, '0')}</Text>
+            <View style={[s.stripArrow, { transform: [{ rotate: `${rotation}deg` }] }]}>
+              <Text style={[s.stripArrowChar, { color: arrowColor }]}>↑</Text>
+            </View>
+            <Text style={[s.stripSpeed, { color: arrowColor }]}>{slot.windSpeed}</Text>
+          </View>
+        );
+      })}
+    </ScrollView>
+  );
+}
+
 function TideRow() {
   const tide = getNextTideEvent();
   const isHigh = tide.type === 'high';
@@ -324,6 +378,45 @@ function statusColors(status: ConditionStatus) {
   return { text: theme.colors.red, border: theme.colors.redBorder, badgeBg: theme.colors.redBg };
 }
 
+function formatHour(h: number): string {
+  return `${String(h).padStart(2, '0')}:00`;
+}
+
+async function shareConditions(assessment: SpotAssessment, bestWindow: BestWindow | null | undefined) {
+  const { name, status, statusLabel, weather, matchingKite, recommendedKiteSize } = assessment;
+
+  let msg = `*${name.toUpperCase()} — ${statusLabel.toUpperCase()}*\n`;
+
+  if (weather) {
+    const kite = matchingKite ?? recommendedKiteSize;
+    const parts = [
+      `${weather.windSpeed}kts ${weather.windDirectionLabel}`,
+      `gusts ${weather.windGust}kts`,
+      ...(kite && status !== 'red' ? [`${kite}m kite`] : []),
+      `${weather.waveHeight.toFixed(1)}m swell`,
+    ];
+    msg += parts.join(' · ') + '\n';
+  }
+
+  if (bestWindow && status !== 'red') {
+    msg += `Best: ${formatHour(bestWindow.startHour)} – ${formatHour(bestWindow.endHour)}\n`;
+  }
+
+  msg += '\nStoke';
+
+  const waUrl = `whatsapp://send?text=${encodeURIComponent(msg)}`;
+  try {
+    const canWhatsApp = await Linking.canOpenURL(waUrl);
+    if (canWhatsApp) {
+      await Linking.openURL(waUrl);
+    } else {
+      await Share.share({ message: msg });
+    }
+  } catch {
+    await Share.share({ message: msg });
+  }
+}
+
 function directionRatingColor(rating: DirectionRating): string {
   if (rating === 'ideal') return theme.colors.green;
   if (rating === 'good') return theme.colors.primaryLight;
@@ -351,6 +444,8 @@ const s = StyleSheet.create({
   },
   backBtn: { padding: theme.spacing.sm },
   headerTitle: { fontSize: theme.text.lg, fontWeight: '700', color: theme.colors.textPrimary, flex: 1, marginLeft: theme.spacing.sm },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm },
+  shareBtn: { padding: theme.spacing.sm },
   statusPill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -387,6 +482,15 @@ const s = StyleSheet.create({
   },
   directionText: { fontSize: theme.text.sm, fontWeight: '600' },
   gustNote: { fontSize: theme.text.xs, color: theme.colors.yellow, lineHeight: 18 },
+  windowRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  windowText: { fontSize: theme.text.sm, fontWeight: '600', color: theme.colors.primary },
+  stripScroll: { marginHorizontal: -theme.spacing.sm },
+  stripContent: { paddingHorizontal: theme.spacing.sm, gap: 2 },
+  stripSlot: { alignItems: 'center', width: 36, gap: 2 },
+  stripHour: { fontSize: 10, color: theme.colors.textMuted },
+  stripArrow: { width: 18, height: 18, alignItems: 'center', justifyContent: 'center' },
+  stripArrowChar: { fontSize: 14, lineHeight: 18 },
+  stripSpeed: { fontSize: 10, fontWeight: '600' },
   kiteBlock: {
     borderWidth: 1.5,
     alignItems: 'flex-start',

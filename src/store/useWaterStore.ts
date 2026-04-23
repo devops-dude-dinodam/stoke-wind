@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { UserProfile, SpotAssessment, SpotId } from '../types';
+import { UserProfile, SpotAssessment, SpotId, BestWindow, HourlySlot } from '../types';
 
 interface WaterState {
   profile: UserProfile;
@@ -10,6 +10,8 @@ interface WaterState {
   lastFetchedAt: number | null;
   lastNotifiedAt: number;
   previousGreenState: Record<SpotId, boolean>;
+  bestWindows: Record<SpotId, BestWindow | null>;
+  hourlySlots: Record<SpotId, HourlySlot[]>;
 
   setProfile: (profile: Partial<UserProfile>) => void;
   completeOnboarding: () => void;
@@ -17,6 +19,8 @@ interface WaterState {
   setFetching: (v: boolean) => void;
   setLastNotifiedAt: (t: number) => void;
   setPreviousGreenState: (v: Record<SpotId, boolean>) => void;
+  setBestWindows: (windows: Record<SpotId, BestWindow | null>) => void;
+  setHourlySlots: (slots: Record<SpotId, HourlySlot[]>) => void;
 }
 
 export const useWaterStore = create<WaterState>()(
@@ -39,6 +43,8 @@ export const useWaterStore = create<WaterState>()(
       lastFetchedAt: null,
       lastNotifiedAt: 0,
       previousGreenState: { pringle: false, silversands: false },
+      bestWindows: { pringle: null, silversands: null },
+      hourlySlots: { pringle: [], silversands: [] },
 
       setProfile: (partial) =>
         set((s) => ({ profile: { ...s.profile, ...partial } })),
@@ -54,6 +60,10 @@ export const useWaterStore = create<WaterState>()(
       setLastNotifiedAt: (lastNotifiedAt) => set({ lastNotifiedAt }),
 
       setPreviousGreenState: (previousGreenState) => set({ previousGreenState }),
+
+      setBestWindows: (bestWindows) => set({ bestWindows }),
+
+      setHourlySlots: (hourlySlots) => set({ hourlySlots }),
     }),
     {
       name: 'water-storage-v1',

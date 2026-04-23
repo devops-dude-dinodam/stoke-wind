@@ -37,6 +37,23 @@ export interface WeatherData {
   fetchedAt: number;
 }
 
+export interface HourlySlot {
+  hour: number;
+  windSpeed: number;
+  windGust: number;
+  windDirectionDeg: number;
+  windDirectionLabel: string;
+}
+
+export interface BestWindow {
+  startHour: number;
+  endHour: number;
+  peakWindSpeed: number;
+  windDirectionLabel: string;
+  status: ConditionStatus;
+  kiteSize: number | null;
+}
+
 export interface SpotAssessment {
   spotId: SpotId;
   name: string;

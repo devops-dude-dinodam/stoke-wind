@@ -1,4 +1,4 @@
-import { SpotId, WeatherData, DailyForecast, SPOTS } from '../types';
+import { SpotId, WeatherData, DailyForecast, HourlySlot, SPOTS } from '../types';
 
 const WEATHER_BASE = 'https://api.open-meteo.com/v1/forecast';
 const MARINE_BASE = 'https://marine-api.open-meteo.com/v1/marine';
@@ -87,6 +87,26 @@ export async function fetchDailyForecast(spotId: SpotId): Promise<DailyForecast[
       windDirectionDeg: windDir,
       windDirectionLabel: degreesToLabel(windDir),
       waveHeightMax: m.daily.wave_height_max[i] ?? 0,
+    };
+  });
+}
+
+export async function fetchTodayHourly(spotId: SpotId): Promise<HourlySlot[]> {
+  const spot = SPOTS[spotId];
+  const url = `${WEATHER_BASE}?latitude=${spot.lat}&longitude=${spot.lon}&hourly=wind_speed_10m,wind_direction_10m,wind_gusts_10m&wind_speed_unit=kn&timezone=Africa%2FJohannesburg&forecast_days=1&models=ecmwf_ifs025`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Hourly fetch failed: ${res.status}`);
+  const data = await res.json();
+  const currentIdx = getCurrentHourIndex(data.hourly.time);
+  return data.hourly.time.slice(currentIdx).map((t: string, i: number) => {
+    const idx = currentIdx + i;
+    const dir = data.hourly.wind_direction_10m[idx];
+    return {
+      hour: parseInt(t.split('T')[1].split(':')[0], 10),
+      windSpeed: Math.round(data.hourly.wind_speed_10m[idx] ?? 0),
+      windGust: Math.round(data.hourly.wind_gusts_10m[idx] ?? 0),
+      windDirectionDeg: dir,
+      windDirectionLabel: degreesToLabel(dir),
     };
   });
 }

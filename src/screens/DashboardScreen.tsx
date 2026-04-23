@@ -5,12 +5,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Settings, RefreshCw, Wind, ChevronRight, CheckCircle, XCircle, MinusCircle } from 'lucide-react-native';
+import { Settings, RefreshCw, Wind, ChevronRight, CheckCircle, XCircle, MinusCircle, Clock } from 'lucide-react-native';
 import { theme } from '../theme/theme';
-import { SpotAssessment, ConditionStatus, SpotId } from '../types';
+import { SpotAssessment, ConditionStatus, SpotId, BestWindow } from '../types';
 import { useWaterStore } from '../store/useWaterStore';
-import { fetchAllSpots } from '../utils/weatherApi';
-import { assessSpot, buildErrorAssessment, getWeatherCondition } from '../utils/kiteAlgorithm';
+import { fetchAllSpots, fetchTodayHourly } from '../utils/weatherApi';
+import { assessSpot, buildErrorAssessment, findBestWindow, getWeatherCondition } from '../utils/kiteAlgorithm';
 import {
   buildConditionsSummary, scheduleDailyNotification,
   sendImmediateNotification, registerBackgroundTask,
@@ -23,6 +23,7 @@ export default function DashboardScreen({ navigation }: Props) {
     profile, assessments, isFetching, lastFetchedAt,
     setAssessments, setFetching, previousGreenState,
     setPreviousGreenState, setLastNotifiedAt, lastNotifiedAt,
+    bestWindows, setBestWindows, setHourlySlots,
   } = useWaterStore();
 
   const REFRESH_COOLDOWN = 60_000;
@@ -34,15 +35,24 @@ export default function DashboardScreen({ navigation }: Props) {
     if (!force && lastFetchedAt && Date.now() - lastFetchedAt < REFRESH_COOLDOWN) return;
     setFetching(true);
     try {
-      const weatherMap = await fetchAllSpots();
       const spotIds: SpotId[] = ['pringle', 'silversands'];
-      const result: Record<SpotId, SpotAssessment | null> = { pringle: null, silversands: null };
+      const [weatherMap, hourlyPringle, hourlySilversands] = await Promise.all([
+        fetchAllSpots(),
+        fetchTodayHourly('pringle'),
+        fetchTodayHourly('silversands'),
+      ]);
 
+      const result: Record<SpotId, SpotAssessment | null> = { pringle: null, silversands: null };
       for (const id of spotIds) {
         result[id] = assessSpot(id, weatherMap[id], profile);
       }
-
       setAssessments(result);
+
+      setBestWindows({
+        pringle: findBestWindow('pringle', hourlyPringle, profile, weatherMap.pringle.waveHeight),
+        silversands: findBestWindow('silversands', hourlySilversands, profile, weatherMap.silversands.waveHeight),
+      });
+      setHourlySlots({ pringle: hourlyPringle, silversands: hourlySilversands });
 
       const list = Object.values(result).filter(Boolean) as SpotAssessment[];
       const twoHours = 2 * 60 * 60 * 1000;
@@ -72,7 +82,7 @@ export default function DashboardScreen({ navigation }: Props) {
     } finally {
       setFetching(false);
     }
-  }, [profile, previousGreenState, lastNotifiedAt, setAssessments, setFetching, setPreviousGreenState, setLastNotifiedAt]);
+  }, [profile, previousGreenState, lastNotifiedAt, setAssessments, setFetching, setPreviousGreenState, setLastNotifiedAt, setBestWindows, setHourlySlots]);
 
   useEffect(() => {
     if (!didMount.current) {
@@ -139,6 +149,7 @@ export default function DashboardScreen({ navigation }: Props) {
           <SpotSummaryCard
             key={assessment.spotId}
             assessment={assessment}
+            bestWindow={bestWindows[assessment.spotId as SpotId]}
             onPress={() => navigation.navigate('SpotDetail', { spotId: assessment.spotId })}
           />
         ))}
@@ -151,7 +162,11 @@ export default function DashboardScreen({ navigation }: Props) {
   );
 }
 
-function SpotSummaryCard({ assessment, onPress }: { assessment: SpotAssessment; onPress: () => void }) {
+function SpotSummaryCard({ assessment, bestWindow, onPress }: {
+  assessment: SpotAssessment;
+  bestWindow: BestWindow | null | undefined;
+  onPress: () => void;
+}) {
   const { status, name, weather, isGusty, matchingKite, kiteSizeLabel, error } = assessment;
   const colors = statusColors(status);
 
@@ -176,6 +191,14 @@ function SpotSummaryCard({ assessment, onPress }: { assessment: SpotAssessment; 
             <Text style={[s.kiteRec, { color: colors.text }]}>
               {kiteSizeLabel}
             </Text>
+          )}
+          {bestWindow && (
+            <View style={s.windowRow}>
+              <Clock size={11} color={theme.colors.textMuted} />
+              <Text style={s.windowText}>
+                {`Best today: ${formatHour(bestWindow.startHour)} – ${formatHour(bestWindow.endHour)}  ·  ${bestWindow.peakWindSpeed}kts ${bestWindow.windDirectionLabel}${bestWindow.kiteSize ? `  ·  ${bestWindow.kiteSize}m` : ''}`}
+              </Text>
+            </View>
           )}
           {error && <Text style={s.errorText}>{error}</Text>}
         </View>
@@ -217,6 +240,10 @@ function formatRelativeTime(ts: number): string {
   return `${Math.floor(diff / 3600)}h ago`;
 }
 
+function formatHour(h: number): string {
+  return `${String(h).padStart(2, '0')}:00`;
+}
+
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.colors.background },
   header: {
@@ -254,6 +281,8 @@ const s = StyleSheet.create({
   gustTag: { fontSize: theme.text.xs, color: theme.colors.yellow },
   wxTag: { fontSize: theme.text.xs, color: theme.colors.textMuted, marginLeft: 6 },
   kiteRec: { fontSize: theme.text.sm, fontWeight: '600' },
+  windowRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  windowText: { fontSize: theme.text.xs, color: theme.colors.textMuted },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',

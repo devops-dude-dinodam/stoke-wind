@@ -1,4 +1,4 @@
-import { SpotId, SkillLevel, RidingStyle, DirectionRating, ConditionStatus, WeatherData, UserProfile, SpotAssessment, DailyForecast, SPOTS } from '../types';
+import { SpotId, SkillLevel, RidingStyle, DirectionRating, ConditionStatus, WeatherData, UserProfile, SpotAssessment, DailyForecast, HourlySlot, BestWindow, SPOTS } from '../types';
 
 const SKILL_MULTIPLIER: Record<SkillLevel, number> = {
   beginner: 1.1,
@@ -12,7 +12,7 @@ const STYLE_MULTIPLIER: Record<RidingStyle, number> = {
   wave_strapless: 0.75, // even less power; wave provides energy
 };
 
-function getDirectionRating(spotId: SpotId, deg: number): { rating: DirectionRating; label: string } {
+export function getDirectionRating(spotId: SpotId, deg: number): { rating: DirectionRating; label: string } {
   const d = ((deg % 360) + 360) % 360;
 
   if (spotId === 'pringle') {
@@ -248,6 +248,75 @@ export function assessDailyForecast(
   }
 
   return { status, statusLabel, kiteSize };
+}
+
+export function findBestWindow(
+  spotId: SpotId,
+  hours: HourlySlot[],
+  profile: UserProfile,
+  waveHeight: number,
+): BestWindow | null {
+  const spot = SPOTS[spotId];
+
+  const assessed = hours.map(h => {
+    const { rating } = getDirectionRating(spotId, h.windDirectionDeg);
+    const gustDiff = h.windGust - h.windSpeed;
+    const isGusty = gustDiff > 7;
+    const tooLight = h.windSpeed < spot.minWind;
+    const tooStrong = h.windGust > spot.absoluteMaxWind;
+    const swellDanger = profile.skillLevel === 'advanced' ? spot.dangerSwell * 1.6 : spot.dangerSwell;
+    const dangerousSwell = waveHeight > swellDanger && h.windSpeed < 15;
+    const worthACheck = tooLight && h.windGust >= 12 && rating !== 'dangerous';
+
+    let status: ConditionStatus;
+    if (rating === 'dangerous' || tooStrong || dangerousSwell || (isGusty && gustDiff > 18)) {
+      status = 'red';
+    } else if ((rating === 'ideal' || rating === 'good') && !tooLight && h.windGust <= spot.optimalMaxWind) {
+      status = 'green';
+    } else if (worthACheck) {
+      status = 'yellow';
+    } else if (tooLight) {
+      status = 'red';
+    } else {
+      status = 'yellow';
+    }
+    return { ...h, status };
+  });
+
+  const findBest = (target: ConditionStatus) => {
+    let bestStart = -1, bestLen = 0, runStart = -1;
+    for (let i = 0; i <= assessed.length; i++) {
+      if (i < assessed.length && assessed[i].status === target) {
+        if (runStart === -1) runStart = i;
+      } else if (runStart !== -1) {
+        const len = i - runStart;
+        if (len > bestLen) { bestLen = len; bestStart = runStart; }
+        runStart = -1;
+      }
+    }
+    return bestLen > 0 ? { start: bestStart, len: bestLen } : null;
+  };
+
+  const win = findBest('green') ?? findBest('yellow');
+  if (!win) return null;
+
+  const slice = assessed.slice(win.start, win.start + win.len);
+  const peak = slice.reduce((b, h) => h.windSpeed > b.windSpeed ? h : b);
+  const boardLength = profile.boardLength ?? 142;
+  const rec = calculateRecommendedKiteSize(
+    profile.weight, boardLength, peak.windSpeed, peak.windGust,
+    profile.skillLevel, profile.ridingStyle,
+  );
+  const kiteSize = findMatchingKite(profile.kiteQuiver, rec) ?? (rec > 0 ? rec : null);
+
+  return {
+    startHour: slice[0].hour,
+    endHour: slice[slice.length - 1].hour + 1,
+    peakWindSpeed: peak.windSpeed,
+    windDirectionLabel: peak.windDirectionLabel,
+    status: findBest('green') ? 'green' : 'yellow',
+    kiteSize,
+  };
 }
 
 export function buildErrorAssessment(spotId: SpotId, error: string): SpotAssessment {
